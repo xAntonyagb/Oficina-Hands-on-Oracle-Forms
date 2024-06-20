@@ -6,3 +6,17 @@
 
 # Compiled Pre-Linked Libraries
 *.plx
+
+# PLSQL
+*.~sql
+*.~pls
+*.~plb
+*.~pck
+*.~pkb
+*.~pks
+*.~prc
+*.~fnc
+*.~trg
+*.~bdc
+*.~tpb
+*.~tps
