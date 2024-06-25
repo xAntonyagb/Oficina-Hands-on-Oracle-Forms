@@ -1,8 +1,8 @@
-create or replace package PKG_VENDA is
+CREATE OR REPLACE PACKAGE PKG_VENDA IS
 
   PROCEDURE EXCLUIR_VENDA(
-            I_CD_VENDA    IN VENDA.CD_VENDA%TYPE, 
-            O_ERROR_MSG   OUT VARCHAR2);
+            I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
+            O_ERROR_MSG     OUT VARCHAR2);
             
   PROCEDURE SAVE_VENDA(
             I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
@@ -13,10 +13,14 @@ create or replace package PKG_VENDA is
             O_OERACAO       OUT CHAR,
             O_ERROR_MSG     OUT VARCHAR2);
 
-end PKG_VENDA;
+END PKG_VENDA;
 /
 CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
 
+  /* Auxiliares */
+  V_COUNT   NUMBER;
+  E_GERAL   EXCEPTION;
+    
   /* Para inserir e fazer update em vendas */
   PROCEDURE SAVE_VENDA(
             I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
@@ -27,9 +31,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
             O_OERACAO       OUT CHAR,
             O_ERROR_MSG     OUT VARCHAR2)
   IS
-    V_COUNT NUMBER;
     V_POS   NUMBER;
-    E_GERAL EXCEPTION;
   BEGIN
     
     -- VALIDAÇÕES
@@ -117,17 +119,18 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         CLIENTE
       WHERE  
         NR_CPF = I_NR_CPFCLIENTE;
+      COMMIT;
       
-      IF V_COUNT = 0 THEN
-        O_ERROR_MSG := 'O cliente informado não existe';
-        RAISE E_GERAL;
-      END IF;
     EXCEPTION
       WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao buscar cliente: ' || SQLERRM;
-        RAISE E_GERAL;
+        V_COUNT := 0;
     END;
-    
+      
+    IF V_COUNT = 0 THEN
+      O_ERROR_MSG := 'O cliente informado não existe';
+      RAISE E_GERAL;
+    END IF;
+      
     /* VALIDAÇÃO DATA */
     IF I_DT_VENDA IS NULL THEN
       O_ERROR_MSG := 'Data da venda não informada';
@@ -178,7 +181,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
             DT_VENDA = I_DT_VENDA
           WHERE 
             CD_VENDA = I_CD_VENDA;
-          
           COMMIT;
           
         -- CASO OCORRA PROBLEMAS NO UPDATE
@@ -212,9 +214,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
             I_CD_VENDA    IN VENDA.CD_VENDA%TYPE, 
             O_ERROR_MSG   OUT VARCHAR2) 
   IS
-    V_COUNT   NUMBER;
-    E_GERAL   EXCEPTION;
-  
   BEGIN
 
     -- VALIDAÇÃO CD_VENDA
@@ -230,10 +229,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
 
     -- VERIFICANDO SE A VENDA EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   VENDA
-      WHERE  CD_VENDA = I_CD_VENDA;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        VENDA
+      WHERE  
+        CD_VENDA = I_CD_VENDA;
+      COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         V_COUNT := 0;
@@ -257,10 +262,12 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
 
     -- EXCLUIR A VENDA
     BEGIN
-      DELETE FROM VENDA
-      WHERE CD_VENDA = I_CD_VENDA;
-      
+      DELETE FROM 
+        VENDA
+      WHERE 
+        CD_VENDA = I_CD_VENDA;
       COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         O_ERROR_MSG := 'Erro ao excluir a venda: ' || SQLERRM;
@@ -287,10 +294,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
       O_ERROR_MSG     OUT VARCHAR2
   )
   IS
-    V_COUNT   NUMBER;
   BEGIN
-    
-    /* DECLARAÇÕES */
     O_VL_TOTAL := 0;
     O_QT_TOTAL := 0;
 
@@ -302,26 +306,27 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
 
     -- Verificando se a venda existe
     BEGIN 
-      SELECT COUNT(*)
-      INTO V_COUNT
-      FROM VENDA
-      WHERE CD_VENDA = I_CD_VENDA;
-          
-      IF V_COUNT = 0 THEN
-          O_ERROR_MSG := 'A venda informada não existe';
-          RETURN;
-      END IF;
+      SELECT 
+        COUNT(*)
+      INTO 
+        V_COUNT
+      FROM 
+        VENDA
+      WHERE 
+        CD_VENDA = I_CD_VENDA;
+      COMMIT;
       
     EXCEPTION
-      WHEN NO_DATA_FOUND THEN
+      WHEN OTHERS THEN
+        V_COUNT := 0;
+    END;
+          
+    IF V_COUNT = 0 THEN
         O_ERROR_MSG := 'A venda informada não existe';
         RETURN;
-      WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao verificar a venda: ' || SQLERRM;
-        RETURN;
-    END;
-
-    -- Buscando o valor total e quantidade total de itens da venda
+    END IF;
+      
+    /* Busca valor total e quantidade total de itens da venda */
     SELECT 
       NVL(SUM(IV.VL_UNITPROD * IV.QT_ADQUIRIDA), 0), 
       NVL(SUM(IV.QT_ADQUIRIDA), 0)
@@ -332,7 +337,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
       ITEMVENDA IV
     WHERE 
       IV.CD_VENDA = I_CD_VENDA;
-        
     COMMIT;
       
   EXCEPTION
@@ -344,4 +348,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
       O_ERROR_MSG := '[BUSCAR_TOTAIS] Erro ao buscar totais: ' || SQLERRM;
       
   END BUSCAR_TOTAIS;
+  
+  ------------------------------------------------------------------------------------------
+  ------------------------------------------------------------------------------------------
+  
+END PKG_VENDA;
 /

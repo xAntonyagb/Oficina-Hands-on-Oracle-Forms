@@ -1,4 +1,4 @@
-create or replace package PKG_ITEMVENDA is
+CREATE OR REPLACE PACKAGE PKG_ITEMVENDA IS
 
   PROCEDURE SAVE_ITEM_VENDA(
             I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
@@ -10,22 +10,26 @@ create or replace package PKG_ITEMVENDA is
             O_ERROR_MSG     OUT VARCHAR2);
             
   PROCEDURE EXCLUIR_ITEM_VENDA(
-            I_CD_VENDA    IN ITEMVENDA.CD_VENDA%TYPE, 
-            I_CD_PRODUTO  IN ITEMVENDA.CD_PRODUTO%TYPE,
-            O_ERROR_MSG   OUT VARCHAR2);
+            I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE, 
+            I_CD_PRODUTO    IN ITEMVENDA.CD_PRODUTO%TYPE,
+            O_ERROR_MSG     OUT VARCHAR2);
             
   PROCEDURE EXCLUIR_ITEM_VENDA_BY_VENDA(
-            I_CD_VENDA    IN ITEMVENDA.CD_VENDA%TYPE,
-            O_ERROR_MSG   OUT VARCHAR2);
+            I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
+            O_ERROR_MSG     OUT VARCHAR2);
             
   FUNCTION CALCULAR_SUBTOTAL(
-      I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
-      I_CD_PRODUTO    IN ITEMVENDA.CD_PRODUTO%TYPE)
+           I_CD_VENDA       IN ITEMVENDA.CD_VENDA%TYPE,
+           I_CD_PRODUTO     IN ITEMVENDA.CD_PRODUTO%TYPE)
   RETURN NUMBER;
 
-end PKG_ITEMVENDA;
+END PKG_ITEMVENDA;
 /
 CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
+
+  /* Auxiliares */
+  V_COUNT   NUMBER;
+  E_GERAL   EXCEPTION;
 
   /* Para inserir e fazer update em itens de venda */
   PROCEDURE SAVE_ITEM_VENDA(
@@ -37,9 +41,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
             O_OPERACAO      OUT CHAR,
             O_ERROR_MSG     OUT VARCHAR2)
   IS
-    V_COUNT NUMBER;
     V_POS   NUMBER;
-    E_GERAL EXCEPTION;
   BEGIN
     
     -- VALIDAÇÕES
@@ -56,23 +58,25 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
 
     -- VERIFICAR SE A VENDA EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   VENDA
-      WHERE  CD_VENDA = I_CD_VENDA;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        VENDA
+      WHERE  
+        CD_VENDA = I_CD_VENDA;
+      COMMIT;
       
-      IF V_COUNT = 0 THEN
-        O_ERROR_MSG := 'A venda informada não existe';
-        RAISE E_GERAL;
-      END IF;
     EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-        O_ERROR_MSG := 'A venda informada não existe';
-        RAISE E_GERAL;
       WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao verificar a venda: ' || SQLERRM;
-        RAISE E_GERAL;
+        V_COUNT := 0;
     END;
+      
+    IF V_COUNT = 0 THEN
+      O_ERROR_MSG := 'A venda informada não existe';
+      RAISE E_GERAL;
+    END IF;
 
     /* VALIDAÇÃO PRODUTO */
     IF I_CD_PRODUTO IS NULL THEN
@@ -87,23 +91,24 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
 
     -- VERIFICAR SE O PRODUTO EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   PRODUTO
-      WHERE  CD_PRODUTO = I_CD_PRODUTO;
-      
-      IF V_COUNT = 0 THEN
-        O_ERROR_MSG := 'O produto informado não existe';
-        RAISE E_GERAL;
-      END IF;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        PRODUTO
+      WHERE  
+        CD_PRODUTO = I_CD_PRODUTO;
+      COMMIT;
     EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-        O_ERROR_MSG := 'O produto informado não existe';
-        RAISE E_GERAL;
       WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao verificar o produto: ' || SQLERRM;
-        RAISE E_GERAL;
+        V_COUNT := 0;
     END;
+    
+    IF V_COUNT = 0 THEN
+      O_ERROR_MSG := 'O produto informado não existe';
+      RAISE E_GERAL;
+    END IF;
 
     /* VALIDAÇÃO VALOR UNIT */
     IF I_VL_UNITPROD IS NULL THEN
@@ -122,7 +127,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
     END IF;
 
     -- Verificar o tamanho da parte decimal
-    V_POS := INSTR(TO_CHAR(I_VL_UNITPROD), '.');
+    V_POS := INSTR(TO_CHAR(I_VL_UNITPROD), ','); -- Retorna pos da virgula
     IF V_POS > 0 THEN
       -- Corta a string a partir da virgula utilizando V_POS para verificar o tamanho
       IF LENGTH(SUBSTR(TO_CHAR(I_VL_UNITPROD), V_POS + 1)) > 2 THEN
@@ -148,7 +153,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
     END IF;
 
     -- Verificar o tamanho da parte decimal
-    V_POS := INSTR(TO_CHAR(I_QT_ADQUIRIDA), '.');
+    V_POS := INSTR(TO_CHAR(I_QT_ADQUIRIDA), ','); -- Retorna pos da virgula
     IF V_POS > 0 THEN
       -- Corta a string a partir da virgula utilizando V_POS para verificar o tamanho
       IF LENGTH(SUBSTR(TO_CHAR(I_QT_ADQUIRIDA), V_POS + 1)) > 2 THEN
@@ -188,7 +193,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
         (CD_VENDA, CD_PRODUTO, VL_UNITPROD, QT_ADQUIRIDA, DT_RECORD)
       VALUES
         (I_CD_VENDA, I_CD_PRODUTO, I_VL_UNITPROD, I_QT_ADQUIRIDA, I_DT_RECORD);
-      
       COMMIT;
     
     EXCEPTION
@@ -196,13 +200,16 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
           O_OPERACAO := 'U';
-          UPDATE ITEMVENDA
-          SET 
-              VL_UNITPROD = I_VL_UNITPROD,
-              QT_ADQUIRIDA = I_QT_ADQUIRIDA,
-              DT_RECORD = I_DT_RECORD
-          WHERE CD_VENDA = I_CD_VENDA AND CD_PRODUTO = I_CD_PRODUTO;
           
+          UPDATE 
+            ITEMVENDA
+          SET 
+            VL_UNITPROD  = I_VL_UNITPROD,
+            QT_ADQUIRIDA = I_QT_ADQUIRIDA,
+            DT_RECORD    = I_DT_RECORD
+          WHERE 
+            CD_VENDA = I_CD_VENDA 
+            AND CD_PRODUTO = I_CD_PRODUTO;
           COMMIT;
           
         -- CASO OCORRA PROBLEMAS NO UPDATE
@@ -237,9 +244,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
             I_CD_PRODUTO  IN ITEMVENDA.CD_PRODUTO%TYPE,
             O_ERROR_MSG   OUT VARCHAR2) 
   IS
-    V_COUNT   NUMBER;
-    E_GERAL   EXCEPTION;
-  
   BEGIN
 
     -- VALIDAÇÃO CD_VENDA
@@ -266,32 +270,42 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
 
     -- VERIFICANDO SE O ITEM DE VENDA EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   ITEMVENDA
-      WHERE  CD_VENDA = I_CD_VENDA AND CD_PRODUTO = I_CD_PRODUTO;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        ITEMVENDA
+      WHERE  
+        CD_VENDA = I_CD_VENDA 
+        AND CD_PRODUTO = I_CD_PRODUTO;
+      COMMIT;
       
-      IF V_COUNT = 0 THEN
-        O_ERROR_MSG := 'O item de venda informado não existe';
-        RAISE E_GERAL; 
-      END IF;
     EXCEPTION
       WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao verificar o item de venda: ' || SQLERRM;
-        RAISE E_GERAL;
+        V_COUNT := 0;
     END;
-
+      
+    IF V_COUNT = 0 THEN
+      O_ERROR_MSG := 'O item de venda informado não existe';
+      RAISE E_GERAL; 
+    END IF;
+      
     -- EXCLUINDO O ITEM DE VENDA
     BEGIN
-      DELETE FROM ITEMVENDA
-      WHERE CD_VENDA = I_CD_VENDA AND CD_PRODUTO = I_CD_PRODUTO;
-      
+      DELETE FROM 
+        ITEMVENDA
+      WHERE 
+        CD_VENDA = I_CD_VENDA 
+        AND CD_PRODUTO = I_CD_PRODUTO;
       COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         O_ERROR_MSG := 'Erro ao excluir o item de venda: ' || SQLERRM;
         RAISE E_GERAL;
     END;
+    
   EXCEPTION
     WHEN e_geral THEN
       O_ERROR_MSG := '[EXCLUIR_ITEM_VENDA] ' || O_ERROR_MSG;
@@ -310,8 +324,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
             I_CD_VENDA    IN ITEMVENDA.CD_VENDA%TYPE,
             O_ERROR_MSG   OUT VARCHAR2)
   IS
-    V_COUNT   NUMBER;
-    E_GERAL   EXCEPTION;
   BEGIN
 
     -- VALIDAÇÃO CD_VENDA
@@ -327,30 +339,34 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
 
     -- VERIFICANDO SE A VENDA EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   VENDA
-      WHERE  CD_VENDA = I_CD_VENDA;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        VENDA
+      WHERE  
+        CD_VENDA = I_CD_VENDA;
+      COMMIT;
       
-      IF V_COUNT = 0 THEN
-        O_ERROR_MSG := 'A venda informada não existe';
-        RAISE E_GERAL;
-      END IF;
     EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-        O_ERROR_MSG := 'A venda informada não existe';
-        RAISE E_GERAL;
       WHEN OTHERS THEN
-        O_ERROR_MSG := 'Erro ao verificar a venda: ' || SQLERRM;
-        RAISE E_GERAL;
+        V_COUNT := 0;
     END;
-
+      
+    IF V_COUNT = 0 THEN
+      O_ERROR_MSG := 'A venda informada não existe';
+      RAISE E_GERAL;
+    END IF;
+      
     -- EXCLUINDO OS ITENS DE VENDA DA VENDA ESPECÍFICA
     BEGIN 
-      DELETE FROM ITEMVENDA
-      WHERE CD_VENDA = I_CD_VENDA;
-
+      DELETE FROM 
+        ITEMVENDA
+      WHERE 
+        CD_VENDA = I_CD_VENDA;
       COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         O_ERROR_MSG := 'Erro ao excluir os itens de venda da venda: ' || SQLERRM;
@@ -372,23 +388,30 @@ CREATE OR REPLACE PACKAGE BODY PKG_ITEMVENDA IS
   
   /* Para retornar o valor calculado do subtotal de um ItemVenda */
   FUNCTION CALCULAR_SUBTOTAL(
-      I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
-      I_CD_PRODUTO    IN ITEMVENDA.CD_PRODUTO%TYPE)
+           I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
+           I_CD_PRODUTO    IN ITEMVENDA.CD_PRODUTO%TYPE)
   RETURN NUMBER
   IS
-      V_SUBTOTAL NUMBER := 0;
+    V_SUBTOTAL NUMBER := 0;
   BEGIN
-      SELECT VL_UNITPROD * QT_ADQUIRIDA
-      INTO V_SUBTOTAL
-      FROM ITEMVENDA
-      WHERE CD_VENDA = I_CD_VENDA AND CD_PRODUTO = I_CD_PRODUTO;
+    SELECT 
+      VL_UNITPROD * QT_ADQUIRIDA
+    INTO 
+      V_SUBTOTAL
+    FROM 
+      ITEMVENDA
+    WHERE 
+      CD_VENDA = I_CD_VENDA 
+      AND CD_PRODUTO = I_CD_PRODUTO;
+    COMMIT;
 
-      RETURN V_SUBTOTAL;
+    RETURN V_SUBTOTAL;
+      
   EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-          RETURN 0; -- Retorna 0 se nada encontrado
-      WHEN OTHERS THEN
-          RETURN -1; -- Retorna -1 caso erro
+    WHEN NO_DATA_FOUND THEN
+      RETURN 0; -- Retorna 0 se nada encontrado
+    WHEN OTHERS THEN
+      RETURN -1; -- Retorna -1 caso erro
   END CALCULAR_SUBTOTAL;
   
   ------------------------------------------------------------------------------------------

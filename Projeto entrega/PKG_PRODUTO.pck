@@ -1,4 +1,4 @@
-CREATE OR REPLACE package PKG_PRODUTO IS
+CREATE OR REPLACE PACKAGE PKG_PRODUTO IS
 
   PROCEDURE SAVE_PRODUTO(
             I_CD_PRODUTO      IN PRODUTO.CD_PRODUTO%TYPE, 
@@ -8,13 +8,17 @@ CREATE OR REPLACE package PKG_PRODUTO IS
             O_ERROR_MSG       OUT VARCHAR2);
             
   PROCEDURE EXCLUIR_PRODUTO(
-            I_CD_PRODUTO    IN PRODUTO.CD_PRODUTO%TYPE, 
-            I_FORCE_DELETE  IN CHAR DEFAULT 'S',
-            O_ERROR_MSG     OUT VARCHAR2);
+            I_CD_PRODUTO      IN PRODUTO.CD_PRODUTO%TYPE, 
+            I_FORCE_DELETE    IN CHAR DEFAULT 'S',
+            O_ERROR_MSG       OUT VARCHAR2);
     
 END PKG_PRODUTO;
 /
 create or replace package body PKG_PRODUTO is
+
+  /* Auxiliares */
+  V_COUNT   NUMBER;
+  E_GERAL   EXCEPTION;
 
   /* Para inserir e fazer update em produtos */
   PROCEDURE SAVE_PRODUTO(
@@ -24,7 +28,6 @@ create or replace package body PKG_PRODUTO is
             O_OERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2)
   IS
-    E_GERAL EXCEPTION;
   BEGIN
     
     -- VALIDA합ES
@@ -60,12 +63,12 @@ create or replace package body PKG_PRODUTO is
     -- OPERA플O SAVE
     BEGIN
       O_OERACAO := 'I';
+      
       -- TENTAR FAZER O INSERT
       INSERT INTO PRODUTO
         (CD_PRODUTO,DS_PRODUTO,VL_UNITARIO)
       VALUES
         (I_CD_PRODUTO,I_DS_PRODUTO,I_VL_UNITARIO);
-      
       COMMIT;
     
     EXCEPTION
@@ -73,12 +76,14 @@ create or replace package body PKG_PRODUTO is
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
           O_OERACAO := 'U';
-          UPDATE PRODUTO
-          SET 
-              DS_PRODUTO =    I_DS_PRODUTO,
-              VL_UNITARIO = I_VL_UNITARIO
-          WHERE CD_PRODUTO = I_CD_PRODUTO;
           
+          UPDATE 
+            PRODUTO
+          SET 
+            DS_PRODUTO =    I_DS_PRODUTO,
+            VL_UNITARIO = I_VL_UNITARIO
+          WHERE 
+            CD_PRODUTO = I_CD_PRODUTO;
           COMMIT;
           
         -- CASO OCORRA PROBLEMAS NO UPDATE
@@ -113,9 +118,6 @@ create or replace package body PKG_PRODUTO is
             I_FORCE_DELETE  IN CHAR DEFAULT 'S',
             O_ERROR_MSG     OUT VARCHAR2) 
   IS
-    V_COUNT   NUMBER;
-    E_GERAL   EXCEPTION;
-  
   BEGIN
 
     -- VALIDA플O CD_PRODUTO
@@ -126,10 +128,16 @@ create or replace package body PKG_PRODUTO is
 
     -- VERIFICANDO SE O PRODUTO EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   PRODUTO
-      WHERE  CD_PRODUTO = I_CD_PRODUTO;
+      SELECT 
+        COUNT(*)
+      INTO   
+        V_COUNT
+      FROM   
+        PRODUTO
+      WHERE  
+        CD_PRODUTO = I_CD_PRODUTO;
+      COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         V_COUNT := 0;
@@ -144,10 +152,16 @@ create or replace package body PKG_PRODUTO is
     IF I_FORCE_DELETE != 'S' THEN
       -- VERIFICANDO SE O PRODUTO EST� PRESENTE EM ALGUMA VENDA 
       BEGIN 
-        SELECT COUNT(*)
-        INTO   V_COUNT
-        FROM   ITEMVENDA
-        WHERE  CD_PRODUTO = I_CD_PRODUTO;
+        SELECT 
+          COUNT(*)
+        INTO   
+          V_COUNT
+        FROM   
+          ITEMVENDA
+        WHERE  
+          CD_PRODUTO = I_CD_PRODUTO;
+        COMMIT;
+        
       EXCEPTION
         WHEN OTHERS THEN
           V_COUNT := 0;
@@ -162,11 +176,14 @@ create or replace package body PKG_PRODUTO is
 
     -- DESATIVAR O PRODUTO
     BEGIN
-      UPDATE PRODUTO
-        SET ST_ATIVO = 'N'
-        WHERE CD_PRODUTO = I_CD_PRODUTO;
-      
+      UPDATE 
+        PRODUTO
+      SET 
+        ST_ATIVO = 'N'
+      WHERE 
+        CD_PRODUTO = I_CD_PRODUTO;
       COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         O_ERROR_MSG := 'Erro ao excluir o produto: ' || SQLERRM;

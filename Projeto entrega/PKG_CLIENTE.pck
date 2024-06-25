@@ -1,20 +1,24 @@
-create or replace package PKG_CLIENTE is
+CREATE OR REPLACE PACKAGE PKG_CLIENTE IS
 
   PROCEDURE SAVE_CLIENTE(
-      I_NR_CPF          IN CLIENTE.NR_CPF%TYPE, 
-      I_NM_CLIENTE      IN CLIENTE.NM_CLIENTE%TYPE, 
-      I_DT_NASCIMENTO   IN CLIENTE.DT_NASCIMENTO%TYPE,
-      O_OERACAO         OUT CHAR,
-      O_ERROR_MSG       OUT VARCHAR2);
+            I_NR_CPF          IN CLIENTE.NR_CPF%TYPE, 
+            I_NM_CLIENTE      IN CLIENTE.NM_CLIENTE%TYPE, 
+            I_DT_NASCIMENTO   IN CLIENTE.DT_NASCIMENTO%TYPE,
+            O_OERACAO         OUT CHAR,
+            O_ERROR_MSG       OUT VARCHAR2);
       
   PROCEDURE EXCLUIR_CLIENTE(
-            I_NR_CPF        IN CLIENTE.NR_CPF%TYPE, 
-            I_FORCE_DELETE  IN CHAR DEFAULT 'S',
-            O_ERROR_MSG     OUT VARCHAR2);
+            I_NR_CPF          IN CLIENTE.NR_CPF%TYPE, 
+            I_FORCE_DELETE    IN CHAR DEFAULT 'S',
+            O_ERROR_MSG       OUT VARCHAR2);
 
-end PKG_CLIENTE;
+END PKG_CLIENTE;
 /
 CREATE OR REPLACE package body PKG_CLIENTE IS
+
+  /* Auxiliares */
+  V_COUNT   NUMBER;
+  E_GERAL   EXCEPTION;
 
   /* Para inserir e fazer update em clientes */
   PROCEDURE SAVE_CLIENTE(
@@ -24,7 +28,6 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
             O_OERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2)
   IS
-    E_GERAL EXCEPTION;
   BEGIN
     
     -- VALIDA합ES
@@ -77,12 +80,12 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
     -- OPERA플O SAVE
     BEGIN
       O_OERACAO := 'I';
+      
       -- TENTAR FAZER O INSERT
       INSERT INTO CLIENTE
         (NR_CPF,NM_CLIENTE,DT_NASCIMENTO)
       VALUES
         (I_NR_CPF,I_NM_CLIENTE,I_DT_NASCIMENTO);
-      
       COMMIT;
     
     EXCEPTION
@@ -90,12 +93,14 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
           O_OERACAO := 'U';
-          UPDATE CLIENTE
-          SET 
-              NM_CLIENTE =    I_NM_CLIENTE,
-              DT_NASCIMENTO = I_DT_NASCIMENTO
-          WHERE NR_CPF = I_NR_CPF;
           
+          UPDATE 
+            CLIENTE
+          SET 
+            NM_CLIENTE =    I_NM_CLIENTE,
+            DT_NASCIMENTO = I_DT_NASCIMENTO
+          WHERE 
+            NR_CPF = I_NR_CPF;
           COMMIT;
           
         -- CASO OCORRA PROBLEMAS NO UPDATE
@@ -130,9 +135,6 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
             I_FORCE_DELETE  IN CHAR DEFAULT 'S',
             O_ERROR_MSG     OUT VARCHAR2) 
   IS
-    V_COUNT   NUMBER;
-    E_GERAL   EXCEPTION;
-  
   BEGIN
 
     -- VALIDA플O CPF
@@ -143,10 +145,16 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
 
     -- VERIFICANDO SE O CLIENTE EXISTE
     BEGIN 
-      SELECT COUNT(*)
-      INTO   V_COUNT
-      FROM   CLIENTE
-      WHERE  NR_CPF = I_NR_CPF;
+      SELECT 
+        COUNT(*)
+      INTO  
+        V_COUNT
+      FROM   
+        CLIENTE
+      WHERE  
+        NR_CPF = I_NR_CPF;
+      COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         V_COUNT := 0;
@@ -161,10 +169,16 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
     IF I_FORCE_DELETE != 'S' THEN
       -- VERIFICANDO SE O CLIENTE EST� PRESENTE EM ALGUMA VENDA 
       BEGIN 
-        SELECT COUNT(*)
-        INTO   V_COUNT
-        FROM   VENDA
-        WHERE  NR_CPFCLIENTE = I_NR_CPF;
+        SELECT 
+          COUNT(*)
+        INTO   
+          V_COUNT
+        FROM   
+          VENDA
+        WHERE  
+          NR_CPFCLIENTE = I_NR_CPF;
+        COMMIT;
+        
       EXCEPTION
         WHEN OTHERS THEN
           V_COUNT := 0;
@@ -179,11 +193,14 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
 
     -- EXCLUINDO O CLIENTE
     BEGIN
-      UPDATE CLIENTE
-      SET ST_ATIVO = 'N'
-      WHERE NR_CPF = I_NR_CPF;
-      
+      UPDATE 
+        CLIENTE
+      SET 
+        ST_ATIVO = 'N'
+      WHERE 
+        NR_CPF = I_NR_CPF;
       COMMIT;
+      
     EXCEPTION
       WHEN OTHERS THEN
         O_ERROR_MSG := 'Erro ao excluir o cliente: ' || SQLERRM;
