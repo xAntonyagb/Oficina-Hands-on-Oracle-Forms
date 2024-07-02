@@ -4,7 +4,7 @@ CREATE OR REPLACE PACKAGE PKG_CLIENTE IS
             I_NR_CPF          IN CLIENTE.NR_CPF%TYPE, 
             I_NM_CLIENTE      IN CLIENTE.NM_CLIENTE%TYPE, 
             I_DT_NASCIMENTO   IN CLIENTE.DT_NASCIMENTO%TYPE,
-            O_OERACAO         OUT CHAR,
+            O_OPERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2);
       
   PROCEDURE EXCLUIR_CLIENTE(
@@ -25,7 +25,7 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
             I_NR_CPF          IN CLIENTE.NR_CPF%TYPE, 
             I_NM_CLIENTE      IN CLIENTE.NM_CLIENTE%TYPE, 
             I_DT_NASCIMENTO   IN CLIENTE.DT_NASCIMENTO%TYPE,
-            O_OERACAO         OUT CHAR,
+            O_OPERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2)
   IS
   BEGIN
@@ -41,6 +41,27 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
       O_ERROR_MSG := 'Informe um CPF com 11 digitos';
       RAISE e_geral;
     END IF;
+    
+    BEGIN
+      SELECT 
+        COUNT(*)
+      INTO 
+        V_COUNT
+      FROM 
+        CLIENTE
+      WHERE 
+        NR_CPF = I_NR_CPF
+        AND ST_ATIVO = 'N';
+
+      IF V_COUNT > 0 THEN
+        O_ERROR_MSG := 'Esse cliente foi excluído e não pode ser modificado';
+        RAISE E_GERAL;
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        O_ERROR_MSG := 'Erro ao verificar o cliente: ' || SQLERRM;
+        RAISE E_GERAL;
+    END;
 
     /* VALIDAÇÃO NOME */
     IF I_NM_CLIENTE IS NULL THEN
@@ -79,7 +100,7 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
 
     -- OPERAÇÃO SAVE
     BEGIN
-      O_OERACAO := 'I';
+      O_OPERACAO := 'I';
       
       -- TENTAR FAZER O INSERT
       INSERT INTO CLIENTE
@@ -92,7 +113,7 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
       -- CASO JÁ EXISTA -> UPDATE  
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
-          O_OERACAO := 'U';
+          O_OPERACAO := 'U';
           
           UPDATE 
             CLIENTE
@@ -153,7 +174,6 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
         CLIENTE
       WHERE  
         NR_CPF = I_NR_CPF;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -177,7 +197,6 @@ CREATE OR REPLACE package body PKG_CLIENTE IS
           VENDA
         WHERE  
           NR_CPFCLIENTE = I_NR_CPF;
-        COMMIT;
         
       EXCEPTION
         WHEN OTHERS THEN

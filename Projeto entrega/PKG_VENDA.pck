@@ -1,16 +1,22 @@
 CREATE OR REPLACE PACKAGE PKG_VENDA IS
-
-  PROCEDURE EXCLUIR_VENDA(
-            I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
-            O_ERROR_MSG     OUT VARCHAR2);
-            
+  
   PROCEDURE SAVE_VENDA(
-            I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
+            I_CD_VENDA      IN OUT VENDA.CD_VENDA%TYPE, 
             I_VL_TOTAL      IN VENDA.VL_TOTAL%TYPE, 
             I_QT_TOTAL      IN VENDA.QT_TOTAL%TYPE, 
             I_NR_CPFCLIENTE IN VENDA.NR_CPFCLIENTE%TYPE,
             I_DT_VENDA      IN VENDA.DT_VENDA%TYPE DEFAULT SYSDATE,
-            O_OERACAO       OUT CHAR,
+            O_OPERACAO       OUT CHAR,
+            O_ERROR_MSG     OUT VARCHAR2);
+            
+  PROCEDURE EXCLUIR_VENDA(
+            I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
+            O_ERROR_MSG     OUT VARCHAR2);
+            
+  PROCEDURE BUSCAR_TOTAIS(
+            I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
+            O_VL_TOTAL      OUT NUMBER,
+            O_QT_TOTAL      OUT NUMBER,
             O_ERROR_MSG     OUT VARCHAR2);
 
 END PKG_VENDA;
@@ -23,22 +29,25 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
     
   /* Para inserir e fazer update em vendas */
   PROCEDURE SAVE_VENDA(
-            I_CD_VENDA      IN VENDA.CD_VENDA%TYPE, 
+            I_CD_VENDA      IN OUT VENDA.CD_VENDA%TYPE, 
             I_VL_TOTAL      IN VENDA.VL_TOTAL%TYPE, 
             I_QT_TOTAL      IN VENDA.QT_TOTAL%TYPE, 
             I_NR_CPFCLIENTE IN VENDA.NR_CPFCLIENTE%TYPE,
             I_DT_VENDA      IN VENDA.DT_VENDA%TYPE DEFAULT SYSDATE,
-            O_OERACAO       OUT CHAR,
+            O_OPERACAO      OUT CHAR,
             O_ERROR_MSG     OUT VARCHAR2)
   IS
-    V_POS   NUMBER;
+    V_POS      NUMBER;
   BEGIN
     
     -- VALIDAÇÕES
     /* VALIDAÇÃO CD_VENDA */
     IF I_CD_VENDA IS NULL THEN
-      O_ERROR_MSG := 'Código da venda não informado';
-      RAISE E_GERAL;
+      SELECT 
+        (NVL(MAX(CD_VENDA), 0) +1)
+      INTO 
+        I_CD_VENDA
+      FROM VENDA;
     END IF;
 
     IF LENGTH(TO_CHAR(I_CD_VENDA)) > 15 THEN
@@ -119,7 +128,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         CLIENTE
       WHERE  
         NR_CPF = I_NR_CPFCLIENTE;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -157,20 +165,18 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
 
     -- OPERAÇÃO SAVE
     BEGIN
-      O_OERACAO := 'I';
+      O_OPERACAO := 'I';
       -- TENTAR FAZER O INSERT
       INSERT INTO VENDA
         (CD_VENDA, VL_TOTAL, QT_TOTAL, NR_CPFCLIENTE, DT_VENDA)
       VALUES
         (I_CD_VENDA, I_VL_TOTAL, I_QT_TOTAL, I_NR_CPFCLIENTE, I_DT_VENDA);
-      
-      COMMIT;
     
     EXCEPTION
       -- CASO JÁ EXISTA -> UPDATE  
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
-          O_OERACAO := 'U';
+          O_OPERACAO := 'U';
           
           UPDATE 
             VENDA
@@ -181,7 +187,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
             DT_VENDA = I_DT_VENDA
           WHERE 
             CD_VENDA = I_CD_VENDA;
-          COMMIT;
           
         -- CASO OCORRA PROBLEMAS NO UPDATE
         EXCEPTION
@@ -195,6 +200,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         O_ERROR_MSG := 'Erro ao inserir a venda: ' || SQLERRM;
         RAISE E_GERAL;
     END;
+    
+    COMMIT;
 
   EXCEPTION
     WHEN E_GERAL THEN
@@ -237,7 +244,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         VENDA
       WHERE  
         CD_VENDA = I_CD_VENDA;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -266,7 +272,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         VENDA
       WHERE 
         CD_VENDA = I_CD_VENDA;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -291,8 +296,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
       I_CD_VENDA      IN ITEMVENDA.CD_VENDA%TYPE,
       O_VL_TOTAL      OUT NUMBER,
       O_QT_TOTAL      OUT NUMBER,
-      O_ERROR_MSG     OUT VARCHAR2
-  )
+      O_ERROR_MSG     OUT VARCHAR2)
   IS
   BEGIN
     O_VL_TOTAL := 0;
@@ -314,7 +318,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
         VENDA
       WHERE 
         CD_VENDA = I_CD_VENDA;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -337,7 +340,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_VENDA IS
       ITEMVENDA IV
     WHERE 
       IV.CD_VENDA = I_CD_VENDA;
-    COMMIT;
       
   EXCEPTION
     WHEN NO_DATA_FOUND THEN

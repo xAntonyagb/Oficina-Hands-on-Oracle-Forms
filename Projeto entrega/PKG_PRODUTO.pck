@@ -4,7 +4,7 @@ CREATE OR REPLACE PACKAGE PKG_PRODUTO IS
             I_CD_PRODUTO      IN PRODUTO.CD_PRODUTO%TYPE, 
             I_DS_PRODUTO      IN PRODUTO.DS_PRODUTO%TYPE, 
             I_VL_UNITARIO     IN PRODUTO.VL_UNITARIO%TYPE,
-            O_OERACAO         OUT CHAR,
+            O_OPERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2);
             
   PROCEDURE EXCLUIR_PRODUTO(
@@ -25,7 +25,7 @@ create or replace package body PKG_PRODUTO is
             I_CD_PRODUTO      IN PRODUTO.CD_PRODUTO%TYPE, 
             I_DS_PRODUTO      IN PRODUTO.DS_PRODUTO%TYPE, 
             I_VL_UNITARIO     IN PRODUTO.VL_UNITARIO%TYPE,
-            O_OERACAO         OUT CHAR,
+            O_OPERACAO         OUT CHAR,
             O_ERROR_MSG       OUT VARCHAR2)
   IS
   BEGIN
@@ -36,6 +36,27 @@ create or replace package body PKG_PRODUTO is
       O_ERROR_MSG := 'Código do produto não informado';
       RAISE e_geral;
     END IF;
+    
+    BEGIN
+      SELECT 
+        COUNT(*)
+      INTO 
+        V_COUNT
+      FROM 
+        PRODUTO
+      WHERE 
+        CD_PRODUTO = I_CD_PRODUTO
+        AND ST_ATIVO = 'N';
+
+      IF V_COUNT > 0 THEN
+        O_ERROR_MSG := 'Esse produto foi excluído e não pode ser modificado';
+        RAISE E_GERAL;
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        O_ERROR_MSG := 'Erro ao verificar o produto: ' || SQLERRM;
+        RAISE E_GERAL;
+    END;
 
     /* VALIDAÇÃO DESCRIÇÃO */
     IF I_DS_PRODUTO IS NULL THEN
@@ -62,7 +83,7 @@ create or replace package body PKG_PRODUTO is
 
     -- OPERAÇÃO SAVE
     BEGIN
-      O_OERACAO := 'I';
+      O_OPERACAO := 'I';
       
       -- TENTAR FAZER O INSERT
       INSERT INTO PRODUTO
@@ -70,12 +91,12 @@ create or replace package body PKG_PRODUTO is
       VALUES
         (I_CD_PRODUTO,I_DS_PRODUTO,I_VL_UNITARIO);
       COMMIT;
-    
+      
     EXCEPTION
       -- CASO JÁ EXISTA -> UPDATE  
       WHEN DUP_VAL_ON_INDEX THEN
         BEGIN
-          O_OERACAO := 'U';
+          O_OPERACAO := 'U';
           
           UPDATE 
             PRODUTO
@@ -136,7 +157,6 @@ create or replace package body PKG_PRODUTO is
         PRODUTO
       WHERE  
         CD_PRODUTO = I_CD_PRODUTO;
-      COMMIT;
       
     EXCEPTION
       WHEN OTHERS THEN
@@ -160,7 +180,6 @@ create or replace package body PKG_PRODUTO is
           ITEMVENDA
         WHERE  
           CD_PRODUTO = I_CD_PRODUTO;
-        COMMIT;
         
       EXCEPTION
         WHEN OTHERS THEN
